@@ -167,3 +167,60 @@ All under `plans/` directory (new):
 - **Results aggregation**: `backtest/toolkit/operation_utils.py` → `aggregate_results_one_strategy()` (L495)
 - **LLM prompts**: `llm_traders/finmem/` and `llm_traders/finagent/`
 - **Regime data**: `backtest/output/SPX_Classification.csv` and `sharpe_records.json` (pre-existing)
+
+---
+
+## 2026-05-06 01:20 IST — Plan 01: Calmar & Omega Ratios Implemented
+
+**Context**: First planned extension. Added Calmar Ratio (AR / MDD) and Omega Ratio (probability-weighted gains vs losses) as primary evaluation metrics alongside existing Sharpe and Sortino.
+
+### Mathematical Definitions
+
+- **Calmar Ratio** = Annualised Return / Maximum Drawdown — penalises strategies with high drawdowns
+- **Omega Ratio** = Σ(gains above threshold) / Σ(losses below threshold) — evaluates the entire return distribution, superior for non-normal returns. Omega > 1.0 means gains outweigh losses.
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `backtest/toolkit/metrics.py` | Added `calculate_calmar_ratio()` and `calculate_omega_ratio()` functions |
+| `backtest/finsaber_bt.py` | Wired new metrics into `_calculate_annualized_metrics()` (computation), `_analyze_results()` (print + return dict) |
+| `backtest/toolkit/operation_utils.py` | Added `calmar_ratio` and `omega_ratio` columns to both `aggregate_results()` and `aggregate_results_one_strategy()`, with `.get()` fallbacks for backward compatibility with old pickle files |
+
+### Verification Run
+
+```bash
+PYTHONPATH=. python backtest/run_baselines_exp.py \
+    --setup cherry_pick_both_finmem \
+    --include BuyAndHoldStrategy \
+    --date_from 2022-10-06 --date_to 2023-04-10
+```
+
+### Results Comparison: Baseline vs Plan 01
+
+**Baseline (before — only Sharpe/Sortino):**
+
+| Ticker | Total Return | Annual Return | Sharpe | Sortino | Max Drawdown |
+|--------|-------------|---------------|--------|---------|-------------|
+| TSLA   | -20.48%     | -27.19%       | -0.34  | -0.47   | 52.73%      |
+| NFLX   | +43.08%     | +64.21%       | 1.33   | 2.32    | 20.18%      |
+| AMZN   | -13.25%     | -17.87%       | -0.46  | -0.68   | 31.55%      |
+| MSFT   | +21.13%     | +30.40%       | 0.97   | 1.50    | 14.16%      |
+| **Avg**| **+7.62%**  | **+12.39%**   |**0.37**|**0.67** | **29.66%**  |
+
+**Plan 01 (after — with Calmar & Omega):**
+
+| Ticker | Total Return | Annual Return | Sharpe | Sortino | **Calmar** | **Omega** | Max Drawdown |
+|--------|-------------|---------------|--------|---------|-----------|----------|-------------|
+| TSLA   | -20.48%     | -27.19%       | -0.34  | -0.47   | **-0.516**| **0.934**| 52.73%      |
+| NFLX   | +43.08%     | +64.21%       | 1.33   | 2.32    | **3.181** | **1.326**| 20.18%      |
+| AMZN   | -13.25%     | -17.87%       | -0.46  | -0.68   | **-0.566**| **0.911**| 31.55%      |
+| MSFT   | +21.13%     | +30.40%       | 0.97   | 1.50    | **2.146** | **1.217**| 14.16%      |
+| **Avg**| **+7.62%**  | **+12.39%**   |**0.37**|**0.67** |**1.061**  |**1.097** | **29.66%**  |
+
+### Key Observations
+
+1. **Calmar exposes drawdown severity**: TSLA's Calmar (-0.516) is worse than its Sharpe (-0.34) because Calmar directly penalises the 52.73% drawdown. NFLX's Calmar (3.181) is much better than its Sharpe (1.33) because its drawdown was moderate relative to its return.
+2. **Omega reveals asymmetry**: TSLA's Omega (0.934 < 1.0) confirms losses outweigh gains at the risk-free threshold. NFLX's Omega (1.326 > 1.0) confirms gains dominate.
+3. **Backward compatible**: Old pickle files without `calmar_ratio`/`omega_ratio` keys default to 0 via `.get()` fallbacks — no breakage.
+

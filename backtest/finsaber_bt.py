@@ -283,7 +283,7 @@ class FINSABERBt:
         max_drawdown = strategy.analyzers.mydrawdown.get_analysis().max.drawdown
         total_return = strategy.broker.getvalue() / test_config.cash - 1
         total_return_cash = strategy.broker.getvalue() - test_config.cash
-        annual_metrics = self._calculate_annualized_metrics(strategy, test_config=test_config)
+        annual_metrics = self._calculate_annualized_metrics(strategy, test_config=test_config, max_drawdown=max_drawdown)
 
         if print_details:
             print("\n" + "=" * 50)
@@ -303,6 +303,8 @@ class FINSABERBt:
             print(f"Annual volatility: {annual_metrics['Annual Volatility']:.2%}")
             print(f"Sharpe ratio: {annual_metrics['Sharpe Ratio']:.4f}")
             print(f"Sortino ratio: {annual_metrics['Sortino Ratio']:.4f}")
+            print(f"Calmar ratio: {annual_metrics['Calmar Ratio']:.4f}")
+            print(f"Omega ratio: {annual_metrics['Omega Ratio']:.4f}")
 
         if print_trades_table:
             trades = []
@@ -322,6 +324,8 @@ class FINSABERBt:
             'annual_return': annual_metrics['Annual Return'],
             'annual_volatility': annual_metrics['Annual Volatility'],
             'sortino_ratio': annual_metrics['Sortino Ratio'],
+            'calmar_ratio': annual_metrics['Calmar Ratio'],
+            'omega_ratio': annual_metrics['Omega Ratio'],
             'max_drawdown': max_drawdown,
             'total_return': total_return
         }
@@ -330,7 +334,8 @@ class FINSABERBt:
     def _calculate_annualized_metrics(
             self,
             strategy: bt.Strategy,
-            test_config: TradeConfig):
+            test_config: TradeConfig,
+            max_drawdown: float = 0.0):
 
         # Calculate the daily returns from the equity curve
         daily_returns = pd.Series(strategy.equity).pct_change().dropna()
@@ -371,14 +376,23 @@ class FINSABERBt:
 
             # Use the analyzer's Sharpe ratio if available
             sharpe_ratio = strategy.analyzers.mysharpe.get_analysis()['sharperatio']
+
+            # Calculate Calmar Ratio (AR / MDD)
+            calmar_ratio = metrics.calculate_calmar_ratio(annual_return, max_drawdown)
+
+            # Calculate Omega Ratio using daily risk-free rate as threshold
+            daily_rf = (1 + test_config.risk_free_rate) ** (1 / 252) - 1
+            omega_ratio = metrics.calculate_omega_ratio(daily_returns, threshold=daily_rf)
         else:
-            annual_return = annual_volatility = sharpe_ratio = sortino_ratio = 0
+            annual_return = annual_volatility = sharpe_ratio = sortino_ratio = calmar_ratio = omega_ratio = 0
 
         return {
             "Annual Return": annual_return,
             "Annual Volatility": annual_volatility,
             "Sharpe Ratio": sharpe_ratio,
             "Sortino Ratio": sortino_ratio,
+            "Calmar Ratio": calmar_ratio,
+            "Omega Ratio": omega_ratio,
         }
 
 

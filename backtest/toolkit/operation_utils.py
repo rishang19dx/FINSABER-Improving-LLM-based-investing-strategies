@@ -379,13 +379,15 @@ def aggregate_results(setup_name:str):
 
         results_df_by_tickers = pd.DataFrame(
             columns=["Period", "ticker", "total_return (%)", "annual_return (%)", "annual_volatility (%)", "sharpe_ratio", "sortino_ratio",
-                     "max_drawdown"])
+                     "calmar_ratio", "omega_ratio", "max_drawdown"])
 
         all_ticker_avg_total_return = 0
         all_ticker_avg_annual_return = 0
         all_ticker_avg_annual_volatility = 0
         all_ticker_avg_sharpe_ratio = 0
         all_ticker_avg_sortino_ratio = 0
+        all_ticker_avg_calmar_ratio = 0
+        all_ticker_avg_omega_ratio = 0
         all_ticker_avg_max_drawdown = 0
         all_ticker_valid_window = 0
 
@@ -398,6 +400,8 @@ def aggregate_results(setup_name:str):
                 avg_annual_volatility = 0
                 avg_sharpe_ratio = 0
                 avg_sortino_ratio = 0
+                avg_calmar_ratio = 0
+                avg_omega_ratio = 0
                 avg_max_drawdown = 0
 
                 for window in rolling_windows:
@@ -409,6 +413,8 @@ def aggregate_results(setup_name:str):
                     avg_annual_volatility += all_results[window][ticker]["annual_volatility"]
                     avg_sharpe_ratio += all_results[window][ticker]["sharpe_ratio"]
                     avg_sortino_ratio += all_results[window][ticker]["sortino_ratio"]
+                    avg_calmar_ratio += all_results[window][ticker].get("calmar_ratio", 0)
+                    avg_omega_ratio += all_results[window][ticker].get("omega_ratio", 0)
                     avg_max_drawdown += all_results[window][ticker]["max_drawdown"]
 
                     all_ticker_avg_total_return += all_results[window][ticker]["total_return"]
@@ -416,6 +422,8 @@ def aggregate_results(setup_name:str):
                     all_ticker_avg_annual_volatility += all_results[window][ticker]["annual_volatility"]
                     all_ticker_avg_sharpe_ratio += all_results[window][ticker]["sharpe_ratio"]
                     all_ticker_avg_sortino_ratio += all_results[window][ticker]["sortino_ratio"]
+                    all_ticker_avg_calmar_ratio += all_results[window][ticker].get("calmar_ratio", 0)
+                    all_ticker_avg_omega_ratio += all_results[window][ticker].get("omega_ratio", 0)
                     all_ticker_avg_max_drawdown += all_results[window][ticker]["max_drawdown"]
 
                     # print("="*10)
@@ -434,6 +442,8 @@ def aggregate_results(setup_name:str):
                             "annual_volatility (%)": "{:.3f}".format(all_results[window][ticker]["annual_volatility"] * 100),
                             "sharpe_ratio": "{:.3f}".format(all_results[window][ticker]["sharpe_ratio"]),
                             "sortino_ratio": "{:.3f}".format(all_results[window][ticker]["sortino_ratio"]),
+                            "calmar_ratio": "{:.3f}".format(all_results[window][ticker].get("calmar_ratio", 0)),
+                            "omega_ratio": "{:.3f}".format(all_results[window][ticker].get("omega_ratio", 0)),
                             "max_drawdown": "{:.3f}".format(-all_results[window][ticker]["max_drawdown"]),
                         },
                         ignore_index=True)
@@ -443,6 +453,8 @@ def aggregate_results(setup_name:str):
                 avg_annual_volatility /= valid_window
                 avg_sharpe_ratio /= valid_window
                 avg_sortino_ratio /= valid_window
+                avg_calmar_ratio /= valid_window
+                avg_omega_ratio /= valid_window
                 avg_max_drawdown /= valid_window
 
                 results_df_by_tickers = results_df_by_tickers._append(
@@ -454,6 +466,8 @@ def aggregate_results(setup_name:str):
                         "annual_volatility (%)": "{:.3f}".format(avg_annual_volatility * 100),
                         "sharpe_ratio": "{:.3f}".format(avg_sharpe_ratio),
                         "sortino_ratio": "{:.3f}".format(avg_sortino_ratio),
+                        "calmar_ratio": "{:.3f}".format(avg_calmar_ratio),
+                        "omega_ratio": "{:.3f}".format(avg_omega_ratio),
                         "max_drawdown": "{:.3f}".format(-avg_max_drawdown),
                     },
                     ignore_index=True)
@@ -463,6 +477,8 @@ def aggregate_results(setup_name:str):
             all_ticker_avg_annual_volatility /= all_ticker_valid_window
             all_ticker_avg_sharpe_ratio /= all_ticker_valid_window
             all_ticker_avg_sortino_ratio /= all_ticker_valid_window
+            all_ticker_avg_calmar_ratio /= all_ticker_valid_window
+            all_ticker_avg_omega_ratio /= all_ticker_valid_window
             all_ticker_avg_max_drawdown /= all_ticker_valid_window
 
             results_df_by_tickers = results_df_by_tickers._append(
@@ -474,6 +490,8 @@ def aggregate_results(setup_name:str):
                     "annual_volatility (%)": "{:.3f}".format(all_ticker_avg_annual_volatility * 100),
                     "sharpe_ratio": "{:.3f}".format(all_ticker_avg_sharpe_ratio),
                     "sortino_ratio": "{:.3f}".format(all_ticker_avg_sortino_ratio),
+                    "calmar_ratio": "{:.3f}".format(all_ticker_avg_calmar_ratio),
+                    "omega_ratio": "{:.3f}".format(all_ticker_avg_omega_ratio),
                     "max_drawdown": "{:.3f}".format(-all_ticker_avg_max_drawdown),
                 },
                 ignore_index=True)
@@ -511,13 +529,15 @@ def aggregate_results_one_strategy(setup_name: str, trading_strategy: str, outpu
 
     results_df_by_tickers = pd.DataFrame(
         columns=["Period", "ticker", "total_return (%)", "annual_return (%)", "annual_volatility (%)", "sharpe_ratio", "sortino_ratio",
-                 "max_drawdown"])
+                 "calmar_ratio", "omega_ratio", "max_drawdown"])
 
     all_ticker_avg_total_return = 0
     all_ticker_avg_annual_return = 0
     all_ticker_avg_annual_volatility = 0
     all_ticker_avg_sharpe_ratio = 0
     all_ticker_avg_sortino_ratio = 0
+    all_ticker_avg_calmar_ratio = 0
+    all_ticker_avg_omega_ratio = 0
     all_ticker_avg_max_drawdown = 0
     all_ticker_valid_window = 0
 
@@ -530,6 +550,8 @@ def aggregate_results_one_strategy(setup_name: str, trading_strategy: str, outpu
         avg_annual_volatility = 0
         avg_sharpe_ratio = 0
         avg_sortino_ratio = 0
+        avg_calmar_ratio = 0
+        avg_omega_ratio = 0
         avg_max_drawdown = 0
 
         for window in rolling_windows:
@@ -541,6 +563,8 @@ def aggregate_results_one_strategy(setup_name: str, trading_strategy: str, outpu
             avg_annual_volatility += all_results[window][ticker]["annual_volatility"]
             avg_sharpe_ratio += all_results[window][ticker]["sharpe_ratio"]
             avg_sortino_ratio += all_results[window][ticker]["sortino_ratio"]
+            avg_calmar_ratio += all_results[window][ticker].get("calmar_ratio", 0)
+            avg_omega_ratio += all_results[window][ticker].get("omega_ratio", 0)
             avg_max_drawdown += all_results[window][ticker]["max_drawdown"]
 
             all_ticker_avg_total_return += all_results[window][ticker]["total_return"]
@@ -548,6 +572,8 @@ def aggregate_results_one_strategy(setup_name: str, trading_strategy: str, outpu
             all_ticker_avg_annual_volatility += all_results[window][ticker]["annual_volatility"]
             all_ticker_avg_sharpe_ratio += all_results[window][ticker]["sharpe_ratio"]
             all_ticker_avg_sortino_ratio += all_results[window][ticker]["sortino_ratio"]
+            all_ticker_avg_calmar_ratio += all_results[window][ticker].get("calmar_ratio", 0)
+            all_ticker_avg_omega_ratio += all_results[window][ticker].get("omega_ratio", 0)
             all_ticker_avg_max_drawdown += all_results[window][ticker]["max_drawdown"]
 
             # print("="*10)
@@ -566,6 +592,8 @@ def aggregate_results_one_strategy(setup_name: str, trading_strategy: str, outpu
                     "annual_volatility (%)": "{:.3f}".format(all_results[window][ticker]["annual_volatility"] * 100),
                     "sharpe_ratio": "{:.3f}".format(all_results[window][ticker]["sharpe_ratio"]),
                     "sortino_ratio": "{:.3f}".format(all_results[window][ticker]["sortino_ratio"]),
+                    "calmar_ratio": "{:.3f}".format(all_results[window][ticker].get("calmar_ratio", 0)),
+                    "omega_ratio": "{:.3f}".format(all_results[window][ticker].get("omega_ratio", 0)),
                     "max_drawdown": "{:.3f}".format(-all_results[window][ticker]["max_drawdown"]),
                 },
                 ignore_index=True)
@@ -575,6 +603,8 @@ def aggregate_results_one_strategy(setup_name: str, trading_strategy: str, outpu
         avg_annual_volatility /= valid_window
         avg_sharpe_ratio /= valid_window
         avg_sortino_ratio /= valid_window
+        avg_calmar_ratio /= valid_window
+        avg_omega_ratio /= valid_window
         avg_max_drawdown /= valid_window
 
         results_df_by_tickers = results_df_by_tickers._append(
@@ -586,6 +616,8 @@ def aggregate_results_one_strategy(setup_name: str, trading_strategy: str, outpu
                 "annual_volatility (%)": "{:.3f}".format(avg_annual_volatility * 100),
                 "sharpe_ratio": "{:.3f}".format(avg_sharpe_ratio),
                 "sortino_ratio": "{:.3f}".format(avg_sortino_ratio),
+                "calmar_ratio": "{:.3f}".format(avg_calmar_ratio),
+                "omega_ratio": "{:.3f}".format(avg_omega_ratio),
                 "max_drawdown": "{:.3f}".format(-avg_max_drawdown),
             },
             ignore_index=True)
@@ -595,6 +627,8 @@ def aggregate_results_one_strategy(setup_name: str, trading_strategy: str, outpu
     all_ticker_avg_annual_volatility /= all_ticker_valid_window
     all_ticker_avg_sharpe_ratio /= all_ticker_valid_window
     all_ticker_avg_sortino_ratio /= all_ticker_valid_window
+    all_ticker_avg_calmar_ratio /= all_ticker_valid_window
+    all_ticker_avg_omega_ratio /= all_ticker_valid_window
     all_ticker_avg_max_drawdown /= all_ticker_valid_window
 
     results_df_by_tickers = results_df_by_tickers._append(
@@ -606,6 +640,8 @@ def aggregate_results_one_strategy(setup_name: str, trading_strategy: str, outpu
             "annual_volatility (%)": "{:.3f}".format(all_ticker_avg_annual_volatility * 100),
             "sharpe_ratio": "{:.3f}".format(all_ticker_avg_sharpe_ratio),
             "sortino_ratio": "{:.3f}".format(all_ticker_avg_sortino_ratio),
+            "calmar_ratio": "{:.3f}".format(all_ticker_avg_calmar_ratio),
+            "omega_ratio": "{:.3f}".format(all_ticker_avg_omega_ratio),
             "max_drawdown": "{:.3f}".format(-all_ticker_avg_max_drawdown),
         },
         ignore_index=True)
