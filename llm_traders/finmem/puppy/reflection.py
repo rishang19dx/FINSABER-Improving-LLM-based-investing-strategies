@@ -348,6 +348,17 @@ def _test_response_model_invest_info(
         investment_info += test_momentum_explanation
         investment_info = _add_momentum_info(momentum, investment_info)
 
+    # ── Regime-Conditioned Signal Injection (Plan 05) ─────────────────
+    # If regime context is available, append it to the investment info
+    # so the LLM sees quantitative risk guidance before making decisions.
+    try:
+        import os
+        regime_context = os.environ.get("_FINSABER_REGIME_CONTEXT", "")
+        if regime_context:
+            investment_info += "\n" + regime_context
+    except Exception:
+        pass
+
     return response_model, investment_info
 
 

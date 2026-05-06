@@ -81,6 +81,19 @@ class FinMemStrategy(BaseStrategyIso):
         )
         self.agent = LLMAgent.from_config(self.config)
 
+        # ── Regime conditioning (Plan 05) ─────────────────────────────
+        self._price_history = []
+        self._regime_enabled = os.environ.get("FINSABER_REGIME_CONDITIONING", "0") == "1"
+        self._regime_signal_gen = None
+        if self._regime_enabled:
+            try:
+                from backtest.toolkit.regime_signal import RegimeSignalGenerator
+                self._regime_signal_gen = RegimeSignalGenerator()
+                self.logger.info("Regime-conditioned prompting ENABLED")
+            except ImportError:
+                self.logger.warning("RegimeSignalGenerator not available — regime conditioning disabled")
+                self._regime_enabled = False
+
     def on_data(
             self,
             date: datetime.date,
@@ -93,6 +106,9 @@ class FinMemStrategy(BaseStrategyIso):
         if isinstance(cur_price, dict):
             cur_price = cur_price["adjusted_close"]
 
+        # Track price history for regime signal
+        self._price_history.append(cur_price)
+
         # self.logger.info(f"{date} price for {symbol}: {cur_price}")
         market_info = self.test_enviroment.step()
 
@@ -102,6 +118,15 @@ class FinMemStrategy(BaseStrategyIso):
 
         if date != self.test_enviroment.cur_date:
             self.logger.warning(f"Date mismatch: {date} vs {self.test_enviroment.cur_date}")
+
+        # ── Inject regime signal into agent context (Plan 05) ─────────
+        if self._regime_enabled and self._regime_signal_gen and len(self._price_history) >= 21:
+            signal = self._regime_signal_gen.compute_signal(self._price_history, current_date=date)
+            regime_text = self._regime_signal_gen.build_prompt_injection(signal)
+            # Inject via environment variable for the reflection module to pick up
+            os.environ["_FINSABER_REGIME_CONTEXT"] = regime_text
+        else:
+            os.environ.pop("_FINSABER_REGIME_CONTEXT", None)
 
         decision = self.agent.step(market_info=market_info, run_mode=RunMode.Test)['direction']
         # self.logger.info(f"Agent decision on {date}: {decision}")

@@ -237,6 +237,19 @@ class FinAgentStrategy(BaseStrategyIso):
             "reasoning": [],
         }
 
+        # ── Regime conditioning (Plan 05) ─────────────────────────────
+        self._price_history = []
+        self._regime_enabled = os.environ.get("FINSABER_REGIME_CONDITIONING", "0") == "1"
+        self._regime_signal_gen = None
+        if self._regime_enabled:
+            try:
+                from backtest.toolkit.regime_signal import RegimeSignalGenerator
+                self._regime_signal_gen = RegimeSignalGenerator()
+                self.logger.info("Regime-conditioned prompting ENABLED for FinAgent")
+            except ImportError:
+                self.logger.warning("RegimeSignalGenerator not available — regime conditioning disabled")
+                self._regime_enabled = False
+
     def _read_template(self, path):
         with open(path, 'r') as f:
             return f.read()
@@ -322,8 +335,14 @@ class FinAgentStrategy(BaseStrategyIso):
         self.high_level_reflection_prompt.add_to_memory(state=state, info=info,
                                                         res=high_res, memory=self.memory, provider=self.provider)
 
-        # Trader preference
-        params["trader_preference"] = ASSET.get_trader(self.trader_preference)
+        # Trader preference (with optional regime context from Plan 05)
+        base_preference = ASSET.get_trader(self.trader_preference)
+        if self._regime_enabled and self._regime_signal_gen and len(self._price_history) >= 21:
+            signal = self._regime_signal_gen.compute_signal(self._price_history, current_date=info.get("date", "N/A"))
+            regime_clause = self._regime_signal_gen.build_finagent_preference(signal)
+            params["trader_preference"] = base_preference + " " + regime_clause
+        else:
+            params["trader_preference"] = base_preference
 
         # Final decision prompt
         template = self.valid_decision_template if mode == "valid" else self.train_decision_template
@@ -365,6 +384,10 @@ class FinAgentStrategy(BaseStrategyIso):
         cur_price = today_data['price'][self.selected_asset]
         if isinstance(cur_price, dict):
             cur_price = cur_price["adjusted_close"]
+
+        # Track price history for regime signal (Plan 05)
+        self._price_history.append(cur_price)
+
         info["price"] = cur_price
         action = self.run_step(state, info, mode="valid")
 
