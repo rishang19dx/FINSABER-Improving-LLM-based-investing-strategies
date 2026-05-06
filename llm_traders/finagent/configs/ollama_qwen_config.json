@@ -1,0 +1,6 @@
+{
+	"comp_model": "qwen2.5:3b",
+	"emb_model": "local:all-MiniLM-L6-v2",
+	"base_url": "http://localhost:11434/v1",
+	"provider_type": "ollama"
+}

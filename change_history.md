@@ -505,3 +505,46 @@ Output: `Extreme Sideways` → "WARNING: No trend and extreme volatility — a c
 3. **12-class guidance table**: Each (trend, volatility) pair has a hand-crafted risk guidance text. This is deliberately opinionated — the point is to give the LLM explicit quantitative risk instructions it wouldn't otherwise have.
 4. **Cannot be tested without `OPENAI_API_KEY`**: The full experimental validation requires live LLM API calls (~$1,584 estimated for the complete matrix). The implementation is complete and verified at the module level; the LLM experiment is deferred until the API key is configured.
 
+---
+
+## 2026-05-06 11:45 IST — Local Ollama LLM Integration
+
+**Context**: In order to circumvent the need for OpenAI API keys, the framework was adapted to support local, open-weights LLMs via Ollama. The primary model tested is `qwen2.5:3b`.
+
+### Files Created / Modified
+
+| File | Change |
+|------|--------|
+| `llm_traders/finmem/puppy/embedding_local.py` | **[NEW]** Local CPU-based embeddings using `sentence-transformers` (`all-MiniLM-L6-v2`) to save VRAM. |
+| `llm_traders/finagent/provider/ollama_provider.py` | **[NEW]** OpenAI-compatible provider client tailored for local Ollama endpoints. |
+| `llm_traders/finmem/puppy/chat.py` | **[MOD]** Built-in support to route generation to local `:11434` endpoints when Ollama models are specified. |
+| `llm_traders/finmem/puppy/memorydb.py` | **[MOD]** Implemented a factory (`_build_embedding`) to toggle between OpenAI and local CPU embeddings. |
+| `backtest/strategy/timing_llm/finagent.py` | **[MOD]** Config-driven dynamic instantiation of LLM providers. |
+| `strats_configs/*_ollama_*` | **[NEW]** Configuration files (JSON/TOML) configured for the `qwen2.5:3b` model. |
+| `backtest/run_ollama_experiments.py` | **[NEW]** Master experiment runner script designed specifically for locally hosted models, including a `--smoke` flag for verification. |
+
+### Key Achievements
+
+1. **VRAM Preservation**: Local CPU embedding logic correctly prevents out-of-memory errors on the GPU.
+2. **API Compatibility**: The Ollama provider successfully mimics the OpenAI client behavior and allows standard framework execution.
+3. **Execution**: A smoke test confirmed the model can run `finmem` inference with a $0.00 cost locally. Full cherry-pick experiments scheduled for automated execution and shutdown.
+
+---
+
+## 2026-05-06 14:15 IST — Headless Matplotlib Backend & Plot Persistence
+
+**Context**: Full automated experiments crashed after one ticker because `plt.show()` attempted to launch an interactive Qt window in a headless session. 
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `backtest/finsaber.py` | Forced Matplotlib `Agg` backend. Replaced `plt.show()` with `plt.savefig()` to save equity curves. |
+| `backtest/finsaber_bt.py` | Replaced `plt.show()` with `plt.savefig()` to save equity curves. |
+| `run_all_and_shutdown.sh` | Added `export QT_QPA_PLATFORM=offscreen` as a failsafe against rogue window spawns. |
+
+### Key Achievements
+
+1. **Crash Prevention**: Removed all interactive display dependencies, ensuring headless bash scripts and background processes can complete.
+2. **Plot Persistence**: Equity curves are now saved systematically to `backtest/output/[setup]/plots/equity_[ticker]_[dates].png` instead of being ephemeral pop-ups.
+3. **Resumed Execution**: Launched the complete 8-hour Ollama background task in a detached process.

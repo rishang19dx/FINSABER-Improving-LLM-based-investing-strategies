@@ -9,7 +9,17 @@ from datetime import date
 from itertools import repeat
 from sortedcontainers import SortedList
 from .embedding import OpenAILongerThanContextEmb
+from .embedding_local import LocalSentenceTransformerEmb
 from typing import List, Union, Dict, Any, Tuple, Callable
+
+
+def _build_embedding(emb_config: Dict[str, Any]):
+    """Factory: return local or OpenAI embedding based on config."""
+    model_name = emb_config.get("embedding_model", "")
+    if model_name.startswith("local:"):
+        local_model = model_name.split(":", 1)[1]
+        return LocalSentenceTransformerEmb(model_name=local_model)
+    return OpenAILongerThanContextEmb(**emb_config)
 from .memory_functions import (
     ImportanceScoreInitialization,
     get_importance_score_initialization_func,
@@ -53,7 +63,7 @@ class MemoryDB:  # can possibly take multiple symbols
         self.jump_threshold_upper = jump_threshold_upper
         self.jump_threshold_lower = jump_threshold_lower
         self.emb_config = emb_config
-        self.emb_func = OpenAILongerThanContextEmb(**self.emb_config)
+        self.emb_func = _build_embedding(self.emb_config)
         # self.emb_func = OpenAILongerThanContextEmb(**self.config["agent"]["agent_1"]["embedding"]["detail"])
         self.emb_dim = self.emb_func.get_embedding_dimension()
         self.importance_score_initialization_func = importance_score_initialization

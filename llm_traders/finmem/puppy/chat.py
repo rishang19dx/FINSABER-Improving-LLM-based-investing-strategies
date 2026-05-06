@@ -43,9 +43,15 @@ class ChatOpenAICompatible(ABC):
         self.end_point = end_point
         self.model = model
         self.system_message = system_message
+        self._is_ollama = "localhost:11434" in self.end_point or "127.0.0.1:11434" in self.end_point
         
         
-        if self.model.startswith("gemini-pro"):
+        if self._is_ollama:
+            self.headers = {
+                "Content-Type": "application/json",
+            }
+            self.other_parameters = {} if other_parameters is None else other_parameters
+        elif self.model.startswith("gemini-pro"):
             proc_result = subprocess.run(["gcloud", "auth", "print-access-token"], capture_output=True, text=True)
             access_token = proc_result.stdout.strip()
             self.headers = {     "Authorization": f"Bearer {access_token}",
@@ -63,7 +69,10 @@ class ChatOpenAICompatible(ABC):
             self.other_parameters = {} if other_parameters is None else other_parameters
 
     def parse_response(self, response: httpx.Response) -> str:
-        if self.model.startswith("gpt"):
+        if self._is_ollama:
+            response_out = response.json()
+            return response_out["choices"][0]["message"]["content"]
+        elif self.model.startswith("gpt"):
             response_out = response.json()
             add_openai_cost_from_response(response_out)
             return response_out["choices"][0]["message"]["content"]
@@ -124,6 +133,17 @@ class ChatOpenAICompatible(ABC):
                 # payload = json.dumps(payload)
                 response = httpx.post(
                     self.end_point, headers=self.headers, json=payload, timeout=600.0  # type: ignore
+                )
+            elif self._is_ollama:
+                payload = {
+                    "model": self.model,
+                    "messages": input_str,
+                    "temperature": 0.0,
+                    "stream": False,
+                }
+                payload = json.dumps(payload)
+                response = httpx.post(
+                    self.end_point, headers=self.headers, data=payload, timeout=600.0
                 )
             else:
                 payload = {

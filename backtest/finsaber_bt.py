@@ -9,6 +9,8 @@ from backtest.toolkit.operation_utils import add_tickers_data, get_tickers_price
 from backtest.strategy.selection import *
 import warnings
 import pickle
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from backtest.toolkit import metrics
 from backtest.toolkit import psr as psr_module
@@ -246,14 +248,24 @@ class FINSABERBt:
             eval_metrics[ticker]["equity_with_time"] = equity_with_time
 
             if not test_config.silence:
-                # Plot the result
+                # Save plot to setup-specific plots directory
                 plt.figure(figsize=(10, 6))
                 plt.plot(equity_with_time["datetime"], equity_with_time["equity"], label="Equity Curve")
                 plt.title(f"Equity Curve for {ticker}")
                 plt.xlabel("Date")
                 plt.ylabel("Equity")
                 plt.legend()
-                plt.show()
+                plots_dir = os.path.join(
+                    test_config.log_base_dir,
+                    test_config.setup_name.replace(":", "_"),
+                    "plots"
+                )
+                os.makedirs(plots_dir, exist_ok=True)
+                safe_date = f"{test_config.date_from}_{test_config.date_to}"
+                plot_path = os.path.join(plots_dir, f"equity_{ticker}_{safe_date}.png")
+                plt.savefig(plot_path, dpi=150, bbox_inches='tight')
+                plt.close()
+                print(f"  Plot saved: {plot_path}")
 
         if "cherry_pick" in test_config.setup_name and test_config.save_results:
             # store the results using pickle

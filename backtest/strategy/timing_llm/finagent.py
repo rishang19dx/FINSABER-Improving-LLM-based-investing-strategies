@@ -25,7 +25,8 @@ load_dotenv()
 
 
 class FinAgentStrategy(BaseStrategyIso):
-    def __init__(self, symbol, market_data_info_path, date_from, date_to, training_period=3):
+    def __init__(self, symbol, market_data_info_path, date_from, date_to, training_period=3,
+                 provider_config=None, llm_model_id=None):
         super().__init__()
         self.logger.info("Initialising FinAgentStrategy.")
 
@@ -49,7 +50,8 @@ class FinAgentStrategy(BaseStrategyIso):
         self.look_back_days = self.long_term_past_date_range
         self.previous_action_look_back_days = 14
         self.top_k = 5
-        self.llm_model_id = "gpt-4o-mini"
+        self.llm_model_id = llm_model_id or "gpt-4o-mini"
+        self._provider_config_path = provider_config
 
         # Template paths for valid mode
         self.valid_latest_market_intelligence_template = self._read_template(
@@ -161,11 +163,26 @@ class FinAgentStrategy(BaseStrategyIso):
             "tag": self.tag,
         })
 
-        # Build provider
-        self.provider = PROVIDER.build({
-            "type": "OpenAIProvider",
-            "provider_cfg_path": "finagent/configs/openai_config.json",
-        })
+        # Build provider — choose Ollama or OpenAI based on config
+        if self._provider_config_path:
+            import json
+            with open(self._provider_config_path) as f:
+                prov_cfg = json.load(f)
+            if prov_cfg.get("provider_type") == "ollama":
+                self.provider = PROVIDER.build({
+                    "type": "OllamaProvider",
+                    "provider_cfg_path": self._provider_config_path,
+                })
+            else:
+                self.provider = PROVIDER.build({
+                    "type": "OpenAIProvider",
+                    "provider_cfg_path": self._provider_config_path,
+                })
+        else:
+            self.provider = PROVIDER.build({
+                "type": "OpenAIProvider",
+                "provider_cfg_path": "finagent/configs/openai_config.json",
+            })
 
         # Build memory (using provider's embedding dimension)
         self.memory = MEMORY.build({

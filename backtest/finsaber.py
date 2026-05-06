@@ -5,6 +5,8 @@ import pickle
 import os
 import numpy as np
 from tabulate import tabulate
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
@@ -111,7 +113,18 @@ class FINSABER:
         plt.xlabel("Date")
         plt.ylabel("Equity")
         plt.legend()
-        plt.show()
+        # Save to setup-specific plots directory instead of plt.show()
+        plots_dir = os.path.join(
+            self.trade_config.log_base_dir,
+            self.trade_config.setup_name.replace(":", "_"),
+            "plots"
+        )
+        os.makedirs(plots_dir, exist_ok=True)
+        safe_date = f"{self.trade_config.date_from}_{self.trade_config.date_to}"
+        plot_path = os.path.join(plots_dir, f"equity_{ticker}_{safe_date}.png")
+        plt.savefig(plot_path, dpi=150, bbox_inches='tight')
+        plt.close()
+        print(f"  Plot saved: {plot_path}")
 
     def run_iterative_tickers(self, strategy_class, strat_params=None, tickers=None, delist_check=False):
         reset_llm_cost()
