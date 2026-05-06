@@ -7,6 +7,7 @@ from tqdm import tqdm
 from dotenv import load_dotenv
 import pandas_datareader.data as web
 import pickle
+import numpy as np
 load_dotenv()
 HF_ACCESS_TOKEN = os.getenv("HF_ACCESS_TOKEN")
 try:
@@ -388,6 +389,8 @@ def aggregate_results(setup_name:str):
         all_ticker_avg_sortino_ratio = 0
         all_ticker_avg_calmar_ratio = 0
         all_ticker_avg_omega_ratio = 0
+        all_ticker_avg_psr = 0
+        all_ticker_avg_min_trl_years = 0
         all_ticker_avg_max_drawdown = 0
         all_ticker_valid_window = 0
 
@@ -402,6 +405,8 @@ def aggregate_results(setup_name:str):
                 avg_sortino_ratio = 0
                 avg_calmar_ratio = 0
                 avg_omega_ratio = 0
+                avg_psr = 0
+                avg_min_trl_years = 0
                 avg_max_drawdown = 0
 
                 for window in rolling_windows:
@@ -415,6 +420,12 @@ def aggregate_results(setup_name:str):
                     avg_sortino_ratio += all_results[window][ticker]["sortino_ratio"]
                     avg_calmar_ratio += all_results[window][ticker].get("calmar_ratio", 0)
                     avg_omega_ratio += all_results[window][ticker].get("omega_ratio", 0)
+                    _psr = all_results[window][ticker].get("psr", 0)
+                    _mtrl = all_results[window][ticker].get("min_trl_years", 0)
+                    if not isinstance(_mtrl, (int, float)) or not np.isfinite(_mtrl):
+                        _mtrl = 0
+                    avg_psr += _psr
+                    avg_min_trl_years += _mtrl
                     avg_max_drawdown += all_results[window][ticker]["max_drawdown"]
 
                     all_ticker_avg_total_return += all_results[window][ticker]["total_return"]
@@ -424,6 +435,8 @@ def aggregate_results(setup_name:str):
                     all_ticker_avg_sortino_ratio += all_results[window][ticker]["sortino_ratio"]
                     all_ticker_avg_calmar_ratio += all_results[window][ticker].get("calmar_ratio", 0)
                     all_ticker_avg_omega_ratio += all_results[window][ticker].get("omega_ratio", 0)
+                    all_ticker_avg_psr += _psr
+                    all_ticker_avg_min_trl_years += _mtrl
                     all_ticker_avg_max_drawdown += all_results[window][ticker]["max_drawdown"]
 
                     # print("="*10)
@@ -444,6 +457,8 @@ def aggregate_results(setup_name:str):
                             "sortino_ratio": "{:.3f}".format(all_results[window][ticker]["sortino_ratio"]),
                             "calmar_ratio": "{:.3f}".format(all_results[window][ticker].get("calmar_ratio", 0)),
                             "omega_ratio": "{:.3f}".format(all_results[window][ticker].get("omega_ratio", 0)),
+                            "psr": "{:.4f}".format(all_results[window][ticker].get("psr", 0)),
+                            "min_trl_years": "{:.2f}".format(_mtrl),
                             "max_drawdown": "{:.3f}".format(-all_results[window][ticker]["max_drawdown"]),
                         },
                         ignore_index=True)
@@ -455,6 +470,8 @@ def aggregate_results(setup_name:str):
                 avg_sortino_ratio /= valid_window
                 avg_calmar_ratio /= valid_window
                 avg_omega_ratio /= valid_window
+                avg_psr /= valid_window
+                avg_min_trl_years /= valid_window
                 avg_max_drawdown /= valid_window
 
                 results_df_by_tickers = results_df_by_tickers._append(
@@ -468,6 +485,8 @@ def aggregate_results(setup_name:str):
                         "sortino_ratio": "{:.3f}".format(avg_sortino_ratio),
                         "calmar_ratio": "{:.3f}".format(avg_calmar_ratio),
                         "omega_ratio": "{:.3f}".format(avg_omega_ratio),
+                        "psr": "{:.4f}".format(avg_psr),
+                        "min_trl_years": "{:.2f}".format(avg_min_trl_years),
                         "max_drawdown": "{:.3f}".format(-avg_max_drawdown),
                     },
                     ignore_index=True)
@@ -479,6 +498,8 @@ def aggregate_results(setup_name:str):
             all_ticker_avg_sortino_ratio /= all_ticker_valid_window
             all_ticker_avg_calmar_ratio /= all_ticker_valid_window
             all_ticker_avg_omega_ratio /= all_ticker_valid_window
+            all_ticker_avg_psr /= all_ticker_valid_window
+            all_ticker_avg_min_trl_years /= all_ticker_valid_window
             all_ticker_avg_max_drawdown /= all_ticker_valid_window
 
             results_df_by_tickers = results_df_by_tickers._append(
@@ -492,6 +513,8 @@ def aggregate_results(setup_name:str):
                     "sortino_ratio": "{:.3f}".format(all_ticker_avg_sortino_ratio),
                     "calmar_ratio": "{:.3f}".format(all_ticker_avg_calmar_ratio),
                     "omega_ratio": "{:.3f}".format(all_ticker_avg_omega_ratio),
+                    "psr": "{:.4f}".format(all_ticker_avg_psr),
+                    "min_trl_years": "{:.2f}".format(all_ticker_avg_min_trl_years),
                     "max_drawdown": "{:.3f}".format(-all_ticker_avg_max_drawdown),
                 },
                 ignore_index=True)
@@ -529,7 +552,7 @@ def aggregate_results_one_strategy(setup_name: str, trading_strategy: str, outpu
 
     results_df_by_tickers = pd.DataFrame(
         columns=["Period", "ticker", "total_return (%)", "annual_return (%)", "annual_volatility (%)", "sharpe_ratio", "sortino_ratio",
-                 "calmar_ratio", "omega_ratio", "max_drawdown"])
+                 "calmar_ratio", "omega_ratio", "psr", "min_trl_years", "max_drawdown"])
 
     all_ticker_avg_total_return = 0
     all_ticker_avg_annual_return = 0
@@ -538,6 +561,8 @@ def aggregate_results_one_strategy(setup_name: str, trading_strategy: str, outpu
     all_ticker_avg_sortino_ratio = 0
     all_ticker_avg_calmar_ratio = 0
     all_ticker_avg_omega_ratio = 0
+    all_ticker_avg_psr = 0
+    all_ticker_avg_min_trl_years = 0
     all_ticker_avg_max_drawdown = 0
     all_ticker_valid_window = 0
 
@@ -552,6 +577,8 @@ def aggregate_results_one_strategy(setup_name: str, trading_strategy: str, outpu
         avg_sortino_ratio = 0
         avg_calmar_ratio = 0
         avg_omega_ratio = 0
+        avg_psr = 0
+        avg_min_trl_years = 0
         avg_max_drawdown = 0
 
         for window in rolling_windows:
@@ -565,6 +592,12 @@ def aggregate_results_one_strategy(setup_name: str, trading_strategy: str, outpu
             avg_sortino_ratio += all_results[window][ticker]["sortino_ratio"]
             avg_calmar_ratio += all_results[window][ticker].get("calmar_ratio", 0)
             avg_omega_ratio += all_results[window][ticker].get("omega_ratio", 0)
+            _psr = all_results[window][ticker].get("psr", 0)
+            _mtrl = all_results[window][ticker].get("min_trl_years", 0)
+            if not isinstance(_mtrl, (int, float)) or not np.isfinite(_mtrl):
+                _mtrl = 0
+            avg_psr += _psr
+            avg_min_trl_years += _mtrl
             avg_max_drawdown += all_results[window][ticker]["max_drawdown"]
 
             all_ticker_avg_total_return += all_results[window][ticker]["total_return"]
@@ -574,6 +607,8 @@ def aggregate_results_one_strategy(setup_name: str, trading_strategy: str, outpu
             all_ticker_avg_sortino_ratio += all_results[window][ticker]["sortino_ratio"]
             all_ticker_avg_calmar_ratio += all_results[window][ticker].get("calmar_ratio", 0)
             all_ticker_avg_omega_ratio += all_results[window][ticker].get("omega_ratio", 0)
+            all_ticker_avg_psr += _psr
+            all_ticker_avg_min_trl_years += _mtrl
             all_ticker_avg_max_drawdown += all_results[window][ticker]["max_drawdown"]
 
             # print("="*10)
@@ -594,6 +629,8 @@ def aggregate_results_one_strategy(setup_name: str, trading_strategy: str, outpu
                     "sortino_ratio": "{:.3f}".format(all_results[window][ticker]["sortino_ratio"]),
                     "calmar_ratio": "{:.3f}".format(all_results[window][ticker].get("calmar_ratio", 0)),
                     "omega_ratio": "{:.3f}".format(all_results[window][ticker].get("omega_ratio", 0)),
+                    "psr": "{:.4f}".format(all_results[window][ticker].get("psr", 0)),
+                    "min_trl_years": "{:.2f}".format(_mtrl),
                     "max_drawdown": "{:.3f}".format(-all_results[window][ticker]["max_drawdown"]),
                 },
                 ignore_index=True)
@@ -605,6 +642,8 @@ def aggregate_results_one_strategy(setup_name: str, trading_strategy: str, outpu
         avg_sortino_ratio /= valid_window
         avg_calmar_ratio /= valid_window
         avg_omega_ratio /= valid_window
+        avg_psr /= valid_window
+        avg_min_trl_years /= valid_window
         avg_max_drawdown /= valid_window
 
         results_df_by_tickers = results_df_by_tickers._append(
@@ -618,6 +657,8 @@ def aggregate_results_one_strategy(setup_name: str, trading_strategy: str, outpu
                 "sortino_ratio": "{:.3f}".format(avg_sortino_ratio),
                 "calmar_ratio": "{:.3f}".format(avg_calmar_ratio),
                 "omega_ratio": "{:.3f}".format(avg_omega_ratio),
+                "psr": "{:.4f}".format(avg_psr),
+                "min_trl_years": "{:.2f}".format(avg_min_trl_years),
                 "max_drawdown": "{:.3f}".format(-avg_max_drawdown),
             },
             ignore_index=True)
@@ -629,6 +670,8 @@ def aggregate_results_one_strategy(setup_name: str, trading_strategy: str, outpu
     all_ticker_avg_sortino_ratio /= all_ticker_valid_window
     all_ticker_avg_calmar_ratio /= all_ticker_valid_window
     all_ticker_avg_omega_ratio /= all_ticker_valid_window
+    all_ticker_avg_psr /= all_ticker_valid_window
+    all_ticker_avg_min_trl_years /= all_ticker_valid_window
     all_ticker_avg_max_drawdown /= all_ticker_valid_window
 
     results_df_by_tickers = results_df_by_tickers._append(
@@ -642,6 +685,8 @@ def aggregate_results_one_strategy(setup_name: str, trading_strategy: str, outpu
             "sortino_ratio": "{:.3f}".format(all_ticker_avg_sortino_ratio),
             "calmar_ratio": "{:.3f}".format(all_ticker_avg_calmar_ratio),
             "omega_ratio": "{:.3f}".format(all_ticker_avg_omega_ratio),
+            "psr": "{:.4f}".format(all_ticker_avg_psr),
+            "min_trl_years": "{:.2f}".format(all_ticker_avg_min_trl_years),
             "max_drawdown": "{:.3f}".format(-all_ticker_avg_max_drawdown),
         },
         ignore_index=True)

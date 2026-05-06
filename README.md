@@ -9,23 +9,66 @@ This repository contains our course project implementation based on the official
 
 ## 📈 Project Roadmap & Implementation Plans
 
-As part of our course project, we have outlined five key extensions to the baseline framework, biased toward mathematical contributions in quantitative finance. Detailed implementation plans are located in the `plans/` directory:
+Five extensions to the baseline framework, biased toward mathematical contributions in quantitative finance. Detailed plans are in `plans/`:
 
-1. **[Calmar & Omega Ratios as Primary Metrics](plans/01_calmar_omega_ratios.md)** (~20h): Integrating Calmar and Omega ratios to better assess tail risk and drawdowns compared to standard Sharpe/Sortino ratios.
-2. **[Regime-Conditional Sharpe (RCS) Metric](plans/02_regime_conditional_sharpe.md)** (~30h): Evaluating strategy robustness by computing Sharpe ratios conditionally based on underlying market regimes (e.g., high vs. low volatility).
-3. **[Probabilistic Sharpe Ratio (PSR) & Min Track Record](plans/03_probabilistic_sharpe_ratio.md)** (~45h): Applying PSR to account for non-normal return distributions (skewness/kurtosis) and calculating the minimum track record required for statistical significance.
-4. **[Rolling Sharpe Drawdown-Triggered Stop Loss](plans/04_rolling_sharpe_stop_loss.md)** (~25h): Implementing a dynamic, portfolio-level risk management pipeline that triggers stop-losses when rolling Sharpe drops below historical thresholds.
-5. **[Regime-Conditioned Prompting with Volatility Signal](plans/05_regime_conditioned_prompting.md)** (~30h): Enhancing the `FinMem` and `FinAgent` LLM strategies by injecting volatility and regime-state signals directly into the prompt context.
+| # | Extension | Status | Key Result |
+|---|-----------|--------|------------|
+| 1 | [Calmar & Omega Ratios](plans/01_calmar_omega_ratios.md) | ✅ Done | Calmar exposes TSLA's -52% drawdown; Omega confirms asymmetric losses |
+| 2 | [Regime-Conditional Sharpe (RCS)](plans/02_regime_conditional_sharpe.md) | ✅ Done | FinMem RCS = **-0.1906** — negative across all regimes |
+| 3 | [Probabilistic Sharpe Ratio & MinTRL](plans/03_probabilistic_sharpe_ratio.md) | ✅ Done | FinMem needs **328.7 years** to validate its Sharpe |
+| 4 | [Rolling Sharpe Stop-Loss](plans/04_rolling_sharpe_stop_loss.md) | 📋 Planned | Dynamic risk overlay for LLM strategies |
+| 5 | [Regime-Conditioned Prompting](plans/05_regime_conditioned_prompting.md) | 📋 Planned | Inject volatility signals into LLM prompts |
+
+---
+
+## 🧮 Extended Metrics & Analysis Tools
+
+### Metrics integrated into the backtest engine
+
+Every backtest run now automatically computes and reports these metrics alongside the original Sharpe/Sortino:
+
+| Metric | Formula | What it reveals |
+|--------|---------|-----------------|
+| **Calmar Ratio** | Annual Return / Max Drawdown | Penalises high-drawdown strategies (LLMs in bear markets) |
+| **Omega Ratio** | Σ(gains > τ) / Σ(losses ≤ τ) | Full return distribution — superior for non-normal returns |
+| **PSR** | P(true SR > 0 \| data) | Statistical significance of observed Sharpe |
+| **MinTRL** | Min observations for 95% confidence | How long you need to trust the Sharpe |
+
+### Standalone analysis scripts
+
+```bash
+# Regime-Conditional Sharpe — ranks all 16 strategies by frequency-weighted regime Sharpe
+PYTHONPATH=. python backtest/run_rcs_analysis.py
+
+# Probabilistic Sharpe Ratio — loads pickle results and computes PSR/MinTRL
+PYTHONPATH=. python backtest/run_psr_analysis.py --setup lowvol_sp500_5
+PYTHONPATH=. python backtest/run_psr_analysis.py --setup cherry_pick_both_finmem
+```
+
+### Headline results
+
+> **FinMem needs 328.7 years** of track record to validate its Sharpe of +0.097 at 95% confidence (excess kurtosis = +1289). The paper evaluated it over 6 months.
+
+| Strategy | RCS | PSR | MinTRL | Verdict |
+|----------|-----|-----|--------|---------|
+| Buy & Hold | +0.4429 | 1.0000 | 9.2y | ✅ Statistically validated |
+| ARIMA | +0.3776 | 1.0000 | 11.7y | ✅ Statistically validated |
+| FinAgent | +0.1287 | 0.9939 | 34.9y | ⚠️ Barely significant |
+| **FinMem** | **-0.1906** | **0.7927** | **328.7y** | ❌ Not trustworthy |
+
+---
 
 ## 🛠️ Current Progress & Modifications
 
-We have bootstrapped the repository and successfully run initial baselines. Detailed logs are available in [change_history.md](change_history.md).
+Detailed logs are available in [change_history.md](change_history.md).
 
-**Key Accomplishments:**
-- **Environment Setup**: Initialized the project on Python 3.13 using `pip` (bypassing conda requirements) and configured `.env`.
-- **Framework Decoupling**: Implemented import guards across `backtest/strategy/` to isolate heavy RL (`stable_baselines3`) and LLM (`sentence_transformers`) dependencies. This allows pure quantitative baselines to run instantly without requiring GPU-heavy package installations.
-- **Data Acquisition**: Downloaded required S&P 500 pricing datasets (~253MB) and cherry-picked stock datasets (~86MB) from HuggingFace.
-- **Successful Baseline Run**: Executed the `BuyAndHoldStrategy` under the `cherry_pick_both_finmem` setup (TSLA, NFLX, AMZN, MSFT) for the 2022-2023 timeframe, establishing a working pipeline and verifying output generation.
+**Completed:**
+- **Environment Setup**: Initialized on Python 3.13 with `pip` (bypassing conda); configured `.env`
+- **Framework Decoupling**: Import guards across `backtest/strategy/` to isolate heavy RL/LLM dependencies
+- **Data Acquisition**: S&P 500 pricing (~253MB) + cherry-picked stocks (~86MB) from HuggingFace
+- **Plan 01 — Calmar & Omega**: Added `calculate_calmar_ratio()` and `calculate_omega_ratio()` to `backtest/toolkit/metrics.py`, wired into engine + aggregation
+- **Plan 02 — RCS**: Created `backtest/toolkit/rcs.py` (RegimeClassifier + compute_rcs) and `backtest/run_rcs_analysis.py`
+- **Plan 03 — PSR & MinTRL**: Created `backtest/toolkit/psr.py` (Bailey & de Prado 2014) and `backtest/run_psr_analysis.py`, wired into engine + aggregation
 
 ---
 

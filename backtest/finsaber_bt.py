@@ -11,6 +11,7 @@ import warnings
 import pickle
 import matplotlib.pyplot as plt
 from backtest.toolkit import metrics
+from backtest.toolkit import psr as psr_module
 
 warnings.filterwarnings("ignore")
 
@@ -305,6 +306,11 @@ class FINSABERBt:
             print(f"Sortino ratio: {annual_metrics['Sortino Ratio']:.4f}")
             print(f"Calmar ratio: {annual_metrics['Calmar Ratio']:.4f}")
             print(f"Omega ratio: {annual_metrics['Omega Ratio']:.4f}")
+            psr_val = annual_metrics['PSR']
+            min_trl = annual_metrics['MinTRL Years']
+            sig = '✓' if psr_val >= 0.95 else '✗'
+            min_trl_str = f"{min_trl:.1f}" if np.isfinite(min_trl) else '∞'
+            print(f"PSR (vs SR=0): {psr_val:.4f} {sig}  |  Min track record: {min_trl_str} years")
 
         if print_trades_table:
             trades = []
@@ -326,6 +332,8 @@ class FINSABERBt:
             'sortino_ratio': annual_metrics['Sortino Ratio'],
             'calmar_ratio': annual_metrics['Calmar Ratio'],
             'omega_ratio': annual_metrics['Omega Ratio'],
+            'psr': annual_metrics['PSR'],
+            'min_trl_years': annual_metrics['MinTRL Years'],
             'max_drawdown': max_drawdown,
             'total_return': total_return
         }
@@ -383,8 +391,15 @@ class FINSABERBt:
             # Calculate Omega Ratio using daily risk-free rate as threshold
             daily_rf = (1 + test_config.risk_free_rate) ** (1 / 252) - 1
             omega_ratio = metrics.calculate_omega_ratio(daily_returns, threshold=daily_rf)
+
+            # Probabilistic Sharpe Ratio & Minimum Track Record Length
+            psr_result = psr_module.compute_psr_from_returns(daily_returns, benchmark_sr=0.0)
+            psr_val = psr_result['psr']
+            min_trl_years = psr_result['min_trl_years']
         else:
             annual_return = annual_volatility = sharpe_ratio = sortino_ratio = calmar_ratio = omega_ratio = 0
+            psr_val = 0.0
+            min_trl_years = float('inf')
 
         return {
             "Annual Return": annual_return,
@@ -393,6 +408,8 @@ class FINSABERBt:
             "Sortino Ratio": sortino_ratio,
             "Calmar Ratio": calmar_ratio,
             "Omega Ratio": omega_ratio,
+            "PSR": psr_val,
+            "MinTRL Years": min_trl_years,
         }
 
 
