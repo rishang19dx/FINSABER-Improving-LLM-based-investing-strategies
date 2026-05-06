@@ -548,3 +548,92 @@ Output: `Extreme Sideways` → "WARNING: No trend and extreme volatility — a c
 1. **Crash Prevention**: Removed all interactive display dependencies, ensuring headless bash scripts and background processes can complete.
 2. **Plot Persistence**: Equity curves are now saved systematically to `backtest/output/[setup]/plots/equity_[ticker]_[dates].png` instead of being ephemeral pop-ups.
 3. **Resumed Execution**: Launched the complete 8-hour Ollama background task in a detached process.
+
+---
+
+## 2026-05-06 21:30 IST — Unified Analysis Dashboard (Priorities 1-3)
+
+**Context**: Built a single comprehensive dashboard script that loads all 280+ result files across 6 setups and produces publication-quality analysis outputs. This completes Priorities 1 (dashboard), 2 (bootstrap RCS), and 3 (cost-adjusted Sharpe) from the project direction plan.
+
+### File Created
+
+| File | Change |
+|------|--------|
+| `backtest/run_unified_dashboard.py` | **[NEW]** Unified dashboard: data loading, all metrics, all plots, bootstrap RCS, cost-adjusted Sharpe |
+
+### Outputs Generated (saved to `backtest/output/dashboard/`)
+
+| File | Description | Size |
+|------|-------------|------|
+| `master_metrics.csv` | All strategies × all metrics (Sharpe, Sortino, Calmar, Omega, PSR, MinTRL, CAS) | 2.9 KB |
+| `regime_heatmap.png` | Enhanced Figure 2: Sharpe by regime with diverging colormap | 121.3 KB |
+| `psr_scatter.png` | Sharpe vs MinTRL scatter showing FinMem at 328.7y | 102.7 KB |
+| `rcs_bootstrap.csv` | RCS with 95% bootstrap CIs (5000 iterations) | 0.8 KB |
+| `rcs_forest.png` | Forest plot of RCS with confidence interval whiskers | 88.2 KB |
+| `risk_overlay.csv` | Before/after risk overlay comparison | 1.5 KB |
+| `overlay_improvement.png` | ΔSharpe bar chart showing universal improvement | 117.6 KB |
+
+### Key Bootstrap RCS Results
+
+| Strategy | RCS | 95% CI | P(RCS>0) |
+|----------|-----|--------|----------|
+| Buy And Hold | +0.4429 | [+0.342, +0.517] | 100.0% |
+| ARIMA | +0.3776 | [+0.336, +0.423] | 100.0% |
+| RL-PPO | +0.2728 | [+0.200, +0.322] | 100.0% |
+| FinAgent | +0.1287 | [+0.057, +0.180] | 99.96% |
+| **FinMem** | **-0.1906** | **[-0.299, -0.115]** | **0.0%** |
+
+**FinMem's RCS is significantly negative** — the entire 95% CI lies below zero, P(RCS>0) = 0.0%. This is now a statistically rigorous result, not just a point estimate.
+
+### Features Implemented
+
+1. **Master Metrics Table**: Sharpe, Sortino, Calmar, Omega, PSR, MinTRL, Cost-Adjusted Sharpe across all setups
+2. **Regime Heatmap**: Dark-themed diverging colormap (RdYlGn) with annotated Sharpe values per regime
+3. **PSR Scatter**: Diamond markers for LLM strategies, squares for RL, circles for traditional — with 20y reference line
+4. **Risk Overlay Bar Chart**: All strategies sorted by ΔSharpe, showing universal improvement
+5. **Bootstrap RCS**: 5000-iteration block-bootstrap resampling years, producing 95% CIs and P(RCS>0/RCS<0)
+6. **Cost-Adjusted Sharpe (CAS)**: SR / (1 + C_api / V0), penalises expensive LLM strategies
+
+---
+
+## 2026-05-06 22:40 IST — ARIMA-LLM Veto Layer Experiment
+
+**Context**: Implemented and ran a post-hoc hybrid strategy experiment that tests whether ARIMA's trend signal can filter out false LLM buy signals. This directly probes whether LLM failures stem from bad risk calibration (fixable) or absent signal quality (fundamental).
+
+### Files Created
+
+| File | Change |
+|------|--------|
+| `backtest/toolkit/veto_layer.py` | **[NEW]** Core logic: correlation-based position inference, position-level veto rules, equity simulation |
+| `backtest/run_veto_experiment.py` | **[NEW]** Experiment runner: loads both LLM and ARIMA pickles, runs 4 variants, produces comparison tables and equity curve plots |
+
+### Outputs Generated (saved to `backtest/output/veto_experiment/`)
+
+| File | Description |
+|------|-------------|
+| `veto_FinMemStrategy_lowvol_sp500_5.csv` | Summary metrics for all 4 variants |
+| `veto_FinAgentStrategy_lowvol_sp500_5.csv` | Same for FinAgent |
+| `veto_curves_FinMemStrategy_lowvol_sp500_5.png` | Best/worst equity curve examples |
+| `veto_curves_FinAgentStrategy_lowvol_sp500_5.png` | Same for FinAgent |
+
+### Results Summary (89 ticker-windows, 20 years)
+
+| Variant | FinMem SR | FinAgent SR |
+|---------|----------|------------|
+| LLM Only | +0.212 | +0.458 |
+| ARIMA Only | **+0.702** | **+0.702** |
+| Veto Hybrid | -0.006 | +0.014 |
+| Reverse Veto | -0.379 | -0.080 |
+
+ARIMA vetoed **89% of FinMem buys** and **86% of FinAgent buys**. The remaining buy signals produced ~0 Sharpe — indistinguishable from cash.
+
+### Key Finding
+
+LLM buy signals carry **no information above what ARIMA already captures**. The veto layer successfully prevents losses (Max DD: 11% → 2.6%) but also kills all gains (return ≈ 0%). This proves the failure is in signal quality itself, not just risk calibration.
+
+### Design Iterations
+
+1. **v1 (ARIMA reconstruction)**: Tried reconstructing ARIMA signals from price data → produced Sharpe of -0.73 (vs actual +0.70) due to training window differences
+2. **v2 (actual ARIMA pickles)**: Used real ARIMA equity curves from existing results → correct performance
+3. **v3 (position-level veto)**: Changed from signal-level (require matching BUY on same day) to position-level (check if ARIMA is IN position when LLM fires BUY) → veto rate dropped from 93% to 89%
+
