@@ -3,21 +3,24 @@
 > **Course:** MA546 - Introduction to Quantitative Finance, IIT Mandi  
 > **Based on Paper:** "Can LLM-based Financial Investing Strategies Outperform the Market in Long Run?" (KDD 2026)  
 
-This repository contains our course project implementation based on the official **FINSABER** framework. We reproduce the baseline experiments and extend the codebase with advanced quantitative metrics, a dynamic risk management overlay, and regime-conditioned LLM prompting.
+This repository contains our course project implementation based on the official **FINSABER** framework. We reproduce the baseline experiments and extend the codebase with advanced quantitative metrics, a dynamic risk management overlay, regime-conditioned LLM prompting, and a hybrid ARIMA-LLM veto layer experiment.
+
+> **📘 Full experiment guide:** See [EXPERIMENT_GUIDE.md](EXPERIMENT_GUIDE.md) for detailed instructions on running and evaluating every modification.
 
 ---
 
-## 📈 Project Roadmap — All 5 Extensions Complete ✅
+## 📈 Project Roadmap — All 6 Extensions Complete ✅
 
-Five extensions to the baseline framework, biased toward mathematical contributions in quantitative finance. Detailed plans are in `plans/`:
+Six extensions to the baseline framework, biased toward mathematical contributions in quantitative finance. Detailed plans are in `plans/`:
 
-| # | Extension | Status | Key Result |
-|---|-----------|--------|------------|
-| 1 | [Calmar & Omega Ratios](plans/01_calmar_omega_ratios.md) | ✅ Done | Calmar exposes TSLA's -52% drawdown; Omega confirms asymmetric losses |
-| 2 | [Regime-Conditional Sharpe (RCS)](plans/02_regime_conditional_sharpe.md) | ✅ Done | FinMem RCS = **-0.1906** — negative across all three regimes |
-| 3 | [Probabilistic Sharpe Ratio & MinTRL](plans/03_probabilistic_sharpe_ratio.md) | ✅ Done | FinMem needs **328.7 years** to validate its Sharpe at 95% confidence |
-| 4 | [Rolling Sharpe Stop-Loss](plans/04_rolling_sharpe_stop_loss.md) | ✅ Done | Risk overlay improves **every** strategy; FinMem SR: -0.256 → +0.730 |
-| 5 | [Regime-Conditioned Prompting](plans/05_regime_conditioned_prompting.md) | ✅ Done | 12-class regime signal injected into FinMem + FinAgent prompts |
+| # | Extension | Post-hoc? | Status | Key Result |
+|---|-----------|-----------|--------|------------|
+| 1 | [Calmar & Omega Ratios](plans/01_calmar_omega_ratios.md) | ✅ | ✅ Done | Calmar exposes TSLA's -52% drawdown; Omega confirms asymmetric losses |
+| 2 | [Regime-Conditional Sharpe (RCS)](plans/02_regime_conditional_sharpe.md) | ✅ | ✅ Done | FinMem RCS = **-0.1906** — negative across all three regimes |
+| 3 | [Probabilistic Sharpe Ratio & MinTRL](plans/03_probabilistic_sharpe_ratio.md) | ✅ | ✅ Done | FinMem needs **328.7 years** to validate its Sharpe at 95% confidence |
+| 4 | [Rolling Sharpe Stop-Loss](plans/04_rolling_sharpe_stop_loss.md) | ✅ | ✅ Done | Risk overlay improves **every** strategy; FinMem SR: -0.256 → +0.730 |
+| 5 | [Regime-Conditioned Prompting](plans/05_regime_conditioned_prompting.md) | ❌ | ✅ Done | 12-class regime signal injected into FinMem + FinAgent prompts |
+| 6 | [ARIMA-LLM Veto Layer](plans/06_veto_layer.md) | ✅ | ✅ Done | LLM buy signals carry **zero orthogonal alpha** above ARIMA |
 
 ---
 
@@ -34,6 +37,22 @@ Every backtest run now automatically computes and reports these metrics alongsid
 | **PSR** | P(true SR > 0 \| data) | Statistical significance of the observed Sharpe |
 | **MinTRL** | Min observations for 95% confidence | How long you need to trust the Sharpe |
 
+### Unified Dashboard (runs Plans 01–04 together)
+
+```bash
+# Produces master metrics table, regime heatmap, PSR scatter, risk overlay chart, bootstrap CIs
+PYTHONPATH=. python backtest/run_unified_dashboard.py
+PYTHONPATH=. python backtest/run_unified_dashboard.py --setups lowvol_sp500_5 cherry_pick_both_finmem
+```
+
+Outputs saved to `backtest/output/dashboard/`:
+- `master_metrics.csv` — Sharpe, Sortino, Calmar, Omega, PSR, MinTRL, RCS for every strategy
+- `regime_heatmap.png` — Enhanced Figure 2 with all strategies × all regimes
+- `psr_scatter.png` — Sharpe vs MinTRL significance plot
+- `overlay_improvement.png` — Risk overlay before/after chart
+- `rcs_forest.png` — RCS with bootstrap 95% CIs
+- `rcs_bootstrap.csv` — 5,000-iteration bootstrap confidence intervals
+
 ### Standalone analysis scripts
 
 ```bash
@@ -42,11 +61,9 @@ PYTHONPATH=. python backtest/run_rcs_analysis.py
 
 # Probabilistic Sharpe Ratio — loads pickle results and computes PSR/MinTRL
 PYTHONPATH=. python backtest/run_psr_analysis.py --setup lowvol_sp500_5
-PYTHONPATH=. python backtest/run_psr_analysis.py --setup cherry_pick_both_finmem
 
 # Rolling Sharpe Risk Overlay — before/after comparison with dynamic position scaling
 PYTHONPATH=. python backtest/run_risk_overlay_analysis.py --setup lowvol_sp500_5
-PYTHONPATH=. python backtest/run_risk_overlay_analysis.py --setup cherry_pick_both_finmem --window 60
 ```
 
 ### Headline results
@@ -97,24 +114,51 @@ PYTHONPATH=. python backtest/run_llm_traders_exp.py \
 
 ---
 
-## 🛠️ Current Progress & Modifications
+## 🔬 ARIMA-LLM Veto Layer (Plan 06)
 
-Detailed logs are available in [change_history.md](change_history.md).
+The strongest negative result: a post-hoc hybrid strategy that tests whether ARIMA's trend signal can rescue LLM buy signals. The veto layer infers position states from existing equity curves and applies asymmetric filtering — ARIMA vetoes LLM buys when its trend model is bearish, while LLM sell signals always pass through.
+
+```bash
+# Run the veto experiment (~30 seconds each)
+PYTHONPATH=. python backtest/run_veto_experiment.py --setup lowvol_sp500_5 --llm FinMemStrategy
+PYTHONPATH=. python backtest/run_veto_experiment.py --setup lowvol_sp500_5 --llm FinAgentStrategy
+```
+
+**Results (89 ticker-windows, 20 years):**
+
+| Variant | FinMem Sharpe | FinAgent Sharpe | Interpretation |
+|---------|:------------:|:--------------:|----------------|
+| LLM Only | +0.212 | +0.458 | Baseline |
+| ARIMA Only | **+0.702** | **+0.702** | Benchmark |
+| Veto Hybrid | -0.169 | +0.021 | Filtered LLM buys ≈ noise |
+| Reverse Veto | -0.727 | -0.714 | LLM signals destroy ARIMA |
+
+ARIMA vetoed **84–86%** of LLM buy signals. The surviving signals produced near-zero Sharpe — proving LLM buy signals carry **no orthogonal information** above what ARIMA already captures. This shifts the paper's conclusion from "LLMs need better risk controls" to "LLM buy signals are noise."
+
+Outputs saved to `backtest/output/veto_experiment/`.
+
+---
+
+## 🛠️ Architecture & File Map
+
+Detailed logs are available in [change_history.md](change_history.md). Full reproduction instructions in [EXPERIMENT_GUIDE.md](EXPERIMENT_GUIDE.md).
 
 **Infrastructure:**
 - **Environment Setup**: Initialized on Python 3.13 with `pip` (bypassing conda); configured `.env`
 - **Framework Decoupling**: Import guards across `backtest/strategy/` to isolate heavy RL/LLM dependencies
 - **Data Acquisition**: S&P 500 pricing (~253MB) + cherry-picked stocks (~86MB) from HuggingFace
 
-**Completed Extensions:**
+**All Extensions:**
 
 | Plan | New/Modified Files | Key Module |
 |------|--------------------|------------|
 | 01 Calmar & Omega | `backtest/toolkit/metrics.py`, `finsaber_bt.py`, `operation_utils.py` | `calculate_calmar_ratio()`, `calculate_omega_ratio()` |
 | 02 RCS | `backtest/toolkit/rcs.py`, `backtest/run_rcs_analysis.py` | `RegimeClassifier`, `compute_rcs()` |
-| 03 PSR & MinTRL | `backtest/toolkit/psr.py`, `backtest/run_psr_analysis.py`, `finsaber_bt.py`, `operation_utils.py` | `probabilistic_sharpe_ratio()`, `minimum_track_record_length()` |
+| 03 PSR & MinTRL | `backtest/toolkit/psr.py`, `backtest/run_psr_analysis.py` | `probabilistic_sharpe_ratio()`, `minimum_track_record_length()` |
 | 04 Risk Overlay | `backtest/toolkit/risk_overlay.py`, `backtest/run_risk_overlay_analysis.py` | `apply_risk_overlay()`, `rolling_sharpe()` |
-| 05 Regime Prompting | `backtest/toolkit/regime_signal.py`, `timing_llm/finmem.py`, `timing_llm/finagent.py`, `puppy/reflection.py` | `RegimeSignalGenerator` |
+| 05 Regime Prompting | `backtest/toolkit/regime_signal.py`, `timing_llm/finmem.py`, `timing_llm/finagent.py` | `RegimeSignalGenerator` |
+| 06 Veto Layer | `backtest/toolkit/veto_layer.py`, `backtest/run_veto_experiment.py` | `infer_position_from_equity()`, `apply_veto_position()` |
+| — Dashboard | `backtest/run_unified_dashboard.py` | Synthesises Plans 01–04 into one report |
 
 ---
 
